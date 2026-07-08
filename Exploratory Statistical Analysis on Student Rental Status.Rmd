@@ -1,0 +1,341 @@
+---
+title: "Exploratory Statistical Analysis on Student Rental Status"
+date: "`r Sys.Date()`"
+author: "Nathan Pavey"
+format: 
+  html: 
+    code-fold: true
+    code-tools: true
+table-of-contents: true
+number-sections: true
+---
+
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(readxl)
+```
+
+# **Introduction**
+
+The increasing cost of living has placed significant financial pressure on university students, particularly those who choose to rent accommodation while studying. Housing expenses can influence many aspects of student life, including spending habits, academic performance, and overall wellbeing. Understanding these relationships is important for identifying the challenges faced by students living independently and for informing future support initiatives. Previous reporting has highlighted that "Students are suffering from stress and anxiety caused by the pressures of housing costs" (Peachy, 2018).
+
+This project investigates whether rental status is associated with differences in university students' academic performance, weekly food expenditure, and preferred teaching structure. The analysis uses survey data collected from students enrolled in the University of Sydney's DATA2002/DATA2902 Semester 2 cohort during 2025. The variables examined include rental status (Yes/No), preference for semester or trimester teaching, weekly expenditure on food and beverages, and Weighted Average Mark (WAM). Data cleaning, visualisation, and statistical analyses were conducted using R to produce reproducible results.
+
+As the survey was distributed voluntarily via email, the dataset represents a convenience sample rather than a random sample of the broader student population. Consequently, the findings should not be interpreted as representative of all university students. Voluntary participation introduces the possibility of selection bias, as students who regularly engage with university emails may have been more likely to respond. In addition, several variables rely on self-reported information, creating the potential for recall bias and response bias. For example, participants may have estimated their weekly food expenditure or reported inaccurate WAM values.
+
+Improvements could be made to questions asked in the survey, particularly in numerically based questions such as height, as many entries either had incorrect units or units labelled differently that made it hard to collate the data. Some other questions such as the amount of alcohol consumed may be sensitive and people wouldn't want to respond a certain way, this could be limited by ensuring participants that all answers will be confidential.
+
+## Data cleaning
+
+Prior to analysis, the dataset underwent a structured data-cleaning process. Missing values were removed, categorical responses were standardised, and observations with implausible values (such as unrealistic WAM scores or weekly food expenditure) were excluded. While these procedures improve data quality, some limitations remain. Certain survey questions permitted inconsistent units or free-text responses, requiring additional cleaning, and sensitive questions may have influenced the accuracy of participant responses despite assurances of anonymity.
+
+| Variable | Acceptable Values |
+|------------------------------------|------------------------------------|
+| pay_rent | Yes, No |
+| trimester_or_semester | Trimester, Semester |
+| weekly_food_spend | Any numerical value above 0 and below 1000 (answers over 1000 may be a data entry error) |
+| WAM | Numbers from 40 to 95 (Chosen to remove unrealistic answers) |
+
+**Figure 1:** Variables and their acceptable ranges used in this study
+
+```{r}
+data = read_excel("DATA2x02_survey_2025_Responses.xlsx")
+new_names = c(  "timestamp",
+  "target_grade",
+  "assignment_preference",
+  "trimester_or_semester",
+  "age",
+  "tendency_yes_or_no",
+  "pay_rent",
+  "stall_choice",
+  "weetbix_count",
+  "weekly_food_spend",
+  "living_arrangements",
+  "weekly_alcohol",
+  "believe_in_aliens",
+  "height",
+  "commute",
+  "daily_anxiety_frequency",
+  "weekly_study_hours",
+  "work_status",
+  "social_media",
+  "gender",
+  "average_daily_sleep",
+  "usual_bedtime",
+  "sleep_schedule",
+  "sibling_count",
+  "allergy_count",
+  "diet_style",
+  "random_number",
+  "favourite_number",
+  "favourite_letter",
+  "drivers_license",
+  "relationship_status",
+  "daily_short_video_time",
+  "computer_os",
+  "steak_preference",
+  "dominant_hand",
+  "enrolled_unit",
+  "weekly_exercise_hours",
+  "weekly_paid_work_hours",
+  "assignments_on_time",
+  "used_r_before",
+  "team_role_type",
+  "university_year",
+  "favourite_anime",
+  "fluent_languages",
+  "readable_languages",
+  "country_of_birth",
+  "wam",
+  "shoe_size",
+  "books_read_highschool",
+  "daily_water_intake_l",
+  "perceived_old_age",
+  "study_music_preference"
+)
+colnames(data) = new_names
+df = data.frame(
+  pay_rent = data$pay_rent,
+  trimester_or_semester = data$trimester_or_semester,
+  weekly_food_spend = data$weekly_food_spend,
+  wam = data$wam
+)
+df_no_NA = na.omit(df)
+#Filter Trimester and Semester
+df_c1 = df_no_NA %>%
+  filter(trimester_or_semester %in% c("Semester", "Trimester"))
+#Filter WAM (0-100)
+df_c2 = df_c1 %>%
+  filter(wam >= 40 & wam <=95) #avoiding unrealistic answers (100 or 0)
+#Filter rent
+df_c3 = df_c2 %>%
+ filter(pay_rent %in% c("Yes", "No"))
+#Filter weekly_food_spend
+df_c4 = df_c3 %>%
+ filter(weekly_food_spend < 1000)
+#DATA IS CLEANED
+```
+
+# **Research**
+
+To investigate the effect of renting on student life, 3 perspectives will be studied, with varying hypothesis tests conducted. These different questions are, "Is the preference for the length of term for a university different depending on rent status?", "Is the average amount of money spent of food each week different between students who rent and those who don't?" and "Is there an impact between students renting and performance at university (WAM)".
+
+## "Is the preference for the length of term for a university different depending on rent status?"
+
+Based on the data in Figure 2, there is a greater proportion of students who rent that prefer trimester over those who don't. This may be due to some students wanting to finish their degrees faster, but also may produce more stress as there is a greater workload to try and find the working balance. To observe this perform Fisher's exact test as the trimester counts are significantly small
+
+```{r}
+ggplot(data = df_c4, aes(x = pay_rent, fill = trimester_or_semester)) +
+  geom_bar(position = "fill")+
+  scale_fill_manual(values = c("Semester" = "#A6CEE3", "Trimester" = "#E69F00")) + 
+    labs (title = "Proportion of Term length preference on Rental Status",
+          x = "Do you pay Rent?",
+          y = "Proportion of Preference",
+          fill = "Trimester or Semester")
+
+```
+
+**Figure 2:** Proportion of term length preference by rental status. Students who rent have a slightly higher preference for trimesters.
+
+```{r}
+table_rent_term <- table(df_c4$pay_rent, df_c4$trimester_or_semester)
+print (table_rent_term)
+```
+
+### Hypothesis Testing (Fisher's Exact Test)
+
+**Hypotheses**
+
+-   Null Hypothesis (H0): Rent status and term preference are independent
+
+-   Alternative Hypothesis (H1): Rent status and term preference are not independent
+
+**Assumptions**
+
+-   Each Result is independent from each other
+
+    This is confirmed true as every student filled out their individual survey and was locked to one response per person
+
+-   Categories are mutually exclusive
+
+    This is checked and confirmed
+
+**Testing**
+
+```{r}
+fisher.test(table_rent_term)
+```
+
+**p-value**
+
+0.1365
+
+**Decision**
+
+Since the p-value is greater than 0.05 we fail to reject the null hypothesis, and therefore there is no evidence to suggest an association between rental status and term preference.
+
+**Limitations:**
+
+The findings should be interpreted with caution due to several limitations of the study. First, the survey was conducted exclusively among University of Sydney students, where the semester teaching structure is prominent. As a result, students may naturally be more inclined to prefer semesters, limiting the generalisability of the findings to students from universities that operate under different teaching structures.
+
+In addition, the final sample consisted of 259 participants, which limits the precision of the analysis. A larger and more diverse sample collected from multiple universities would improve the reliability of the estimates and increase the extent to which the findings can be generalised to the broader university student population.
+
+## "Is the average amount of money spent of food each week different between students who rent and those who don't?"
+
+Rent takes up a large chunk of a student's budget. This may also create financial pressures as they may have to spend more on food since they are living alone which would lead to further financial stress. This visualisation can be seen in Figure 3
+
+```{r}
+ggplot(data = df_c4, aes(x = pay_rent, y = weekly_food_spend, fill = pay_rent))+
+  geom_boxplot() +
+  scale_fill_manual(values = c("No" = "#FF9999", "Yes" = "#99CC99")) +
+  labs(
+    title = "Weekly Food Spend by Rent Status Boxplot",
+    x = "Do you pay Rent?",
+    y = "Weekly spending on food ($)",
+  ) +
+  theme(legend.position = "none")
+```
+
+**Figure 3:** Boxplot of weekly food expenditure based on rental status. Students that pay rent have a visibly larger spread and greater mean.
+
+### Hypothesis Testing (Wilcoxon rank-sum test)
+
+**Hypotheses**
+
+-   Null Hypothesis (H0): No difference in the mean of weekly spending between those that rent and those that do not
+
+-   Alternative Hypothesis (H1): There is a difference in the weekly mean between the two groups.
+
+**Assumptions**
+
+-   Each Result is independent from each other
+
+    This is confirmed true as every student filled out their individual survey and was locked to one response per person
+
+-   The distribution follow the same distribution
+
+    Based on the two histograms below in figure 4, the distribution is left skewed and so this assumption is passed
+
+```{r}
+ggplot(df_c4, aes(x = weekly_food_spend, fill = pay_rent)) +
+  geom_histogram(binwidth = 50, color = "black") +
+  scale_fill_manual(values = c("No" = "#FF9999", "Yes" = "#99CC99")) +
+  facet_wrap(~pay_rent) +
+  labs(
+    title = "Weekly spending on food by Rent Status Histogram",
+    x = "Weekly spending on food ($)",
+    y = "Count",
+    fill = "Do you pay rent?"
+  )
+```
+
+**Figure 4:** Histogram of weekly expenditure split by rental status. The distribution of both graphs are left skewed.
+
+**Test Statistic:**
+
+```{r}
+df_c4$rank = rank(df_c4$weekly_food_spend)
+ranks_no_rent = df_c4$rank[df_c4$pay_rent == "No"]
+ranks_yes_rent = df_c4$rank[df_c4$pay_rent == "Yes"]
+n2 = sum(df_c4$pay_rent == "Yes")
+n1 = sum(df_c4$pay_rent == "No")
+w = sum(ranks_no_rent)
+E_w = (n1*(n1 + n2 + 1))/2
+V_w = (n1*n2*(n1 + n2+1))/12
+Z = (w-E_w)/sqrt(V_w)
+```
+
+Z - Statistic = -5.81
+
+**p-value**
+
+```{r}
+p_value = 2*pnorm(Z)
+```
+
+6.18\*10\^-9
+
+**Decision**
+
+Since the p-value is significantly less than 0.05, we reject the Null hypothesis, and therefore there is a statistical difference between the average weekly spending of students who rent compared to those who do not.
+
+**Limitations:**
+
+The analysis is subject to several limitations. First, the sample size was relatively small, reducing the precision of the results. Collecting data from a larger sample would improve the reliability and generalisability of the findings.
+
+In addition, weekly food expenditure was self-reported, making the results susceptible to recall bias, as participants may not accurately remember their typical weekly spending. During the data-cleaning process, four observations with reported weekly food expenditure exceeding \$1,000 were removed, as these values were considered implausible and likely represented data entry errors. While this improves data quality, it is possible that excluding these observations may have had a small influence on the results.
+
+## "Is there an impact between students renting and performance at university (WAM)."
+
+Overall performance at university is measured by a student's WAM. Students that rent, may have to spend more time away studying, and are more stressed with a lack of time. This may lead to a decrease in performance. A slight projection of this can be seen in figure 5 below with the peak of the two histograms being located 5 marks away from each other.
+
+```{r}
+ggplot(df_c4, aes(x = wam, fill = pay_rent)) +
+    geom_histogram(binwidth = 5, color = "black") +
+  scale_fill_manual(values = c("No" = "#FF9999", "Yes" = "#99CC99")) +
+  facet_wrap(~pay_rent) +
+  labs(
+    title = "WAM by Rent Status",
+    x = "Weighted Average Mark (WAM)",
+    y = "Count",
+    fill = "Do you pay rent?"
+  )
+```
+
+**Figure 5:** Histogram of Student's WAM split by rental status, both graphs look fairly normal although those that do not rent seem to have a higher mean.
+
+### Hypothesis Testing (Monte Carlo Simulation)
+
+**Hypothesis**
+
+The distribution of WAM is the same for students that rent and don't rent
+
+The distribution of WAM is not the same for students for students that rent or don't rent.
+
+**Assumptions:**
+
+There are no assumptions in the Monte Carlo Simulation test
+
+**Sampling**
+
+```{r}
+Difference = mean(df_c4$wam[df_c4$pay_rent == "Yes"]) - mean(df_c4$wam[df_c4$pay_rent == "No"])
+ns = 10000
+sample_diff = numeric(ns)
+set.seed(540697582)
+for(i in 1:ns){
+  sample_wam = sample(df_c4$wam) 
+  sample_diff[i] = mean(sample_wam[df_c4$pay_rent == "Yes"]) - mean(sample_wam[df_c4$pay_rent == "No"])
+}
+```
+
+**p-value**
+
+```{r}
+p_value3 = mean(abs(sample_diff) >= abs(Difference))
+
+```
+
+0.0269
+
+**Decision**
+
+Since the p-value is smaller than 0.05, we reject the null hypothesis, and therefore there is evidence that the distribution of WAM is different for those who rent and those who do not
+
+**Limitations:**
+
+The findings should be interpreted with several limitations in mind. As WAM was self-reported, the results may be affected by response bias if participants reported inaccurate marks, either intentionally or unintentionally. The relatively small sample size of 291 participants also limits the precision and generalisability of the findings, and a larger sample would provide more reliable estimates.
+
+# **Conclusion**
+
+This analysis investigated whether rental status is associated with differences in university students' academic performance, weekly food expenditure, and preferred semester length. The results indicated no statistically significant association between rental status and preference for semesters or trimesters. However, statistically significant differences were observed in both weekly food expenditure and Weighted Average Mark (WAM) between students who rent and those who do not.
+
+While these findings suggest that rental status may be associated with certain aspects of student life, they should be interpreted with caution. The data were collected from a non-random convenience sample of University of Sydney students, limiting the generalisability of the results to the wider university population. In addition, the relatively small sample size and the potential for selection, recall, and response bias may have influenced the findings.
+
+Overall, this project demonstrates how statistical methods can be used to investigate relationships within survey data while highlighting the importance of considering study design and data limitations when interpreting results.
+
+# **References**
+
+Peachy, K. (2018, March 27). *Students are suffering from stress and anxiety caused by the pressures of housing costs*. BBC News. <https://www.bbc.com/news/business-43157092>
+
+R Core Team. (2023). *R: A language and environment for statistical computing*. R Foundation for Statistical Computing. <https://www.R-project.org/>
